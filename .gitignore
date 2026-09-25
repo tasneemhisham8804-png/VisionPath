@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+.env
+.env.local
+
+# Models, datasets, media (use LFS or external storage instead)
+*.pt
+*.onnx
+*.hef
+*.tflite
+detection/datasets/raw/
+*.mp4
+*.avi
+*.wav
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Build artifacts
+dist/
+build/
+*.log
