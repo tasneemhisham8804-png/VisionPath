@@ -74,3 +74,23 @@ This is a small sample. A larger test is planned.
 
 \- Week 4: tune recognition for Egyptian accents and expand the test set.
 
+
+
+\## Week 2 - Egyptian Arabic voice samples
+
+\- Script: `record\_samples.py` records a fixed list of 20 phrases (commands, help, navigation, and longer sentences) with a consent check, a speaker ID (no real names), and a `metadata.csv` file.
+
+\- Collected so far: 1 speaker (s01), 20 recordings, 5 seconds each, 16 kHz mono.
+
+\- Status: first speaker only. More volunteers will be recorded to make the set more varied (gender, age, accent).
+
+\- Audio files are not in the repo (excluded in `.gitignore`); they are shared separately.
+
+\- Next: use these samples in week 4 to measure and tune recognition for Egyptian accents.
+
+## Next steps
+
+\- Week 3: Piper for offline speech and the emergency alert message.
+
+\- Week 4: tune recognition for Egyptian accents and expand the test set.
+
