@@ -1,0 +1,105 @@
+// VisionPath — Schema 1: core (بيانات الأشخاص والحسابات — من التطبيق)
+// Paste into https://dbdiagram.io/d
+
+Project VisionPath_core {
+  database_type: 'SQL Server'
+  Note: 'Schema 1 — people, accounts and settings (entered from the mobile app)'
+}
+
+// =========================================================
+// Schema 1: core
+// =========================================================
+
+Table core.languages {
+  language_id int [pk, increment]
+  code varchar(5) [unique, not null, note: 'ar-EG / en']
+  name nvarchar(50) [not null]
+}
+
+Table core.users {
+  user_id int [pk, increment]
+  full_name nvarchar(100) [not null]
+  phone varchar(20)
+  date_of_birth date
+  gender varchar(10)
+  language_id int [ref: > core.languages.language_id]
+  vision_level varchar(20) [note: 'total / partial']
+  location_sharing_paused bit [default: 0, note: 'also pauses wellbeing check pushes']
+
+  // first run setup (voice guided)
+  height_cm smallint [note: '100 - 230']
+  walking_pace varchar(10) [note: 'slow / normal / fast']
+  speech_rate varchar(10) [note: 'slow / normal / fast']
+  haptic_strength smallint [note: '1 (weak) - 5 (strong)']
+
+  // passive wellbeing check settings (set by the caregiver)
+  wellbeing_interval_min smallint [not null, default: 15, note: '10 - 60 minutes']
+  quiet_hours_start time [note: 'no wellbeing prompts from this time']
+  quiet_hours_end time [note: 'until this time']
+
+  created_at datetimeoffset [default: `SYSDATETIMEOFFSET()`]
+}
+
+Table core.caregivers {
+  caregiver_id int [pk, increment]
+  full_name nvarchar(100) [not null]
+  phone varchar(20)
+  email varchar(100) [unique, not null]
+  password_hash varchar(255) [null, note: 'bcrypt; NULL if Firebase Auth is used']
+  language_id int [ref: > core.languages.language_id]
+  created_at datetimeoffset [default: `SYSDATETIMEOFFSET()`]
+}
+
+Table core.caregiver_devices {
+  id int [pk, increment]
+  caregiver_id int [not null, ref: > core.caregivers.caregiver_id]
+  platform varchar(10) [note: 'android / ios']
+}
+
+Table core.user_caregivers {
+  user_id int [not null, ref: > core.users.user_id]
+  caregiver_id int [not null, ref: > core.caregivers.caregiver_id]
+  relationship nvarchar(30)
+  is_primary bit [default: 0]
+  can_see_location bit [default: 1]
+  can_see_battery bit [default: 1]
+  can_see_daily_summary bit [default: 1]
+  can_receive_emergencies bit [default: 1]
+
+  indexes {
+    (user_id, caregiver_id) [pk]
+  }
+}
+
+Table core.emergency_contacts {
+  contact_id int [pk, increment]
+  user_id int [not null, ref: > core.users.user_id]
+  name nvarchar(100) [not null]
+  phone varchar(20) [not null]
+  relationship nvarchar(30)
+  priority_order smallint [not null, note: '1 = first in the choose-who-to-call menu']
+  is_ambulance bit [default: 0]
+}
+
+Table core.devices {
+  device_id int [pk, increment]
+  user_id int [ref: > core.users.user_id]
+  serial_number varchar(50) [unique, not null]
+  hw_version varchar(20)
+  fw_version varchar(20)
+  registered_at datetimeoffset [default: `SYSDATETIMEOFFSET()`]
+}
+
+// =========================================================
+// Group
+// =========================================================
+
+TableGroup core_schema [color: #2E86AB] {
+  core.languages
+  core.users
+  core.caregivers
+  core.caregiver_devices
+  core.user_caregivers
+  core.emergency_contacts
+  core.devices
+}

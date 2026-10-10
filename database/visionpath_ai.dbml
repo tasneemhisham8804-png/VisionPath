@@ -1,0 +1,280 @@
+// VisionPath — Schema 2: ai (بيانات الجهاز أثناء التشغيل — من الفيست والـ AI)
+// Paste into https://dbdiagram.io/d
+// الجدولين الرمادي (core.users و core.caregivers) مجرد مرجع من سكيما core
+// عشان العلاقات تبان في الرسمة — تعريفهم الكامل في ملف core.
+
+Project VisionPath_ai {
+  database_type: 'SQL Server'
+  Note: 'Schema 2 — data produced by the wearable and the AI while running'
+}
+
+// =========================================================
+// External references from core (defined fully in core file)
+// =========================================================
+
+Table core.users [headercolor: #9E9E9E] {
+  user_id int [pk, note: 'defined in core schema']
+  full_name nvarchar(100)
+  Note: 'Reference only — full table in core schema'
+}
+
+Table core.caregivers [headercolor: #9E9E9E] {
+  caregiver_id int [pk, note: 'defined in core schema']
+  full_name nvarchar(100)
+  Note: 'Reference only — full table in core schema'
+}
+
+// =========================================================
+// Schema 2: ai — walking, detection and alerts
+// =========================================================
+
+Table ai.sessions {
+  session_id bigint [pk, increment]
+  user_id int [not null, ref: > core.users.user_id]
+  started_at datetimeoffset [not null, note: 'wall clock at start']
+  monotonic_start_s float [note: 'shared monotonic clock at the same moment -> converts message timestamps']
+  ended_at datetimeoffset [note: 'NULL while running']
+  git_commit varchar(40)
+  start_battery_pct smallint
+  end_battery_pct smallint
+  distance_walked_m real
+}
+
+Table ai.obstacles {
+  obstacle_id bigint [pk, increment]
+  session_id bigint [not null, ref: > ai.sessions.session_id]
+  track_id int [note: 'ByteTrack ID within session']
+  class varchar(30) [note: 'pole / step / curb / pedestrian / overhead / manhole / pothole / motorbike / tuktuk / cable / unknown']
+  confidence real
+  source varchar(15) [note: 'camera / ultrasonic / fused']
+  distance_m real
+  direction varchar(10) [note: 'left / ahead / right (as in the data contract)']
+  height_level varchar(10) [note: 'ground / body / head']
+  drop_height_band varchar(10) [note: 'low / medium / high (curbs, steps, holes)']
+  closing_speed_mps real
+  ttc_s real [note: 'time to collision']
+  hazard_score real
+  first_seen datetimeoffset
+  last_seen datetimeoffset
+  lat float
+  lon float
+}
+
+Table ai.alerts {
+  alert_id bigint [pk, increment]
+  session_id bigint [not null, ref: > ai.sessions.session_id]
+  obstacle_id bigint [null, ref: > ai.obstacles.obstacle_id]
+  fault_id bigint [null, ref: > ai.faults.fault_id]
+  ts datetimeoffset [not null]
+  alert_type varchar(20) [note: 'obstacle / battery_low / system_fault / weather_degraded / fall']
+  reason_code varchar(40) [note: 'e.g. POLE_AHEAD_2S']
+  channel varchar(10) [note: 'voice / haptic / buzzer']
+  direction varchar(10)
+  priority smallint
+  message nvarchar(max)
+  e2e_latency_ms real [note: 'target < 300 ms']
+}
+
+Table ai.location_logs {
+  log_id bigint [pk, increment]
+  session_id bigint [not null, ref: > ai.sessions.session_id]
+  ts datetimeoffset [not null]
+  lat float
+  lon float
+  accuracy_m real
+}
+
+// =========================================================
+// Emergencies and wellbeing
+// =========================================================
+
+Table ai.emergency_events {
+  event_id bigint [pk, increment]
+  user_id int [not null, ref: > core.users.user_id]
+  session_id bigint [ref: > ai.sessions.session_id]
+  ts datetimeoffset [not null]
+  trigger_type varchar(20) [note: 'ambulance_button / contact_button / fall / wellbeing / critical_battery']
+  severity varchar(10)
+  lat float
+  lon float
+  battery_pct smallint
+  status varchar(20) [note: 'pending / notified / cancelled / resolved']
+  cancel_method varchar(10) [note: 'voice / button (NULL if not cancelled)']
+  caregiver_notified_at datetimeoffset
+  acknowledged_at datetimeoffset [note: 'caregiver tapped I have seen it']
+  acknowledged_by int [ref: > core.caregivers.caregiver_id]
+  resolved_at datetimeoffset
+}
+
+Table ai.call_attempts {
+  attempt_id bigint [pk, increment]
+  event_id bigint [not null, ref: > ai.emergency_events.event_id]
+  caregiver_id int [ref: > core.caregivers.caregiver_id, note: 'push alarm sent to this caregiver']
+  attempt_order smallint [note: '1 = first push, 2 = resend after 5 min ...']
+  status varchar(15) [note: 'pending / sent / acknowledged / failed']
+  failure_reason nvarchar(100)
+  attempted_at datetimeoffset
+  completed_at datetimeoffset
+}
+
+Table ai.wellbeing_checks {
+  check_id bigint [pk, increment]
+  user_id int [not null, ref: > core.users.user_id]
+  session_id bigint [ref: > ai.sessions.session_id]
+  stationary_since datetimeoffset [note: 'from the stationary signal']
+  interval_min smallint [note: 'interval in force at the time']
+  started_at datetimeoffset [not null, note: 'first prompt']
+  lat float
+  lon float
+  attempts smallint [note: '1 or 2']
+  outcome varchar(20) [note: 'okay_voice / okay_button / escalated / overridden_by_fall']
+  responded_at datetimeoffset
+  emergency_event_id bigint [ref: > ai.emergency_events.event_id, note: 'set when escalated']
+  notification_status varchar(15) [note: 'not_needed / queued / sent / acknowledged / failed']
+  ended_at datetimeoffset
+}
+
+// =========================================================
+// System health and black box
+// =========================================================
+
+Table ai.faults {
+  fault_id bigint [pk, increment]
+  session_id bigint [not null, ref: > ai.sessions.session_id]
+  module varchar(20) [note: 'camera / ultrasonic / imu / gps / network / app / detector / battery']
+  fault_type varchar(25) [note: 'heartbeat_lost / self_test_failed / no_internet / app_disconnected / throttling / undervoltage']
+  detected_by varchar(15) [note: 'watchdog / self_test / module']
+  detected_at datetimeoffset [not null]
+  degraded_mode varchar(30) [note: 'e.g. ultrasonic_only']
+  user_notified varchar(10) [note: 'voice / haptic / none']
+  message nvarchar(200)
+  recovered_at datetimeoffset
+}
+
+Table ai.blackbox_snapshots {
+  snapshot_id bigint [pk, increment]
+  session_id bigint [not null, ref: > ai.sessions.session_id]
+  ts datetimeoffset [not null]
+  trigger_type varchar(15) [note: 'fall / near_miss / fault / manual']
+  duration_s smallint [default: 30]
+  file_path nvarchar(400) [note: 'file stays on the Pi']
+  file_size_kb int
+  emergency_event_id bigint [ref: > ai.emergency_events.event_id]
+  obstacle_id bigint [ref: > ai.obstacles.obstacle_id]
+  fault_id bigint [ref: > ai.faults.fault_id]
+}
+
+Table ai.performance_metrics {
+  metric_id bigint [pk, increment]
+  session_id bigint [ref: > ai.sessions.session_id]
+  ts datetimeoffset [not null]
+  frame_id bigint
+  module varchar(20) [note: 'detector / fusion / tracker / hazard / alert / system']
+  metric varchar(30) [note: 'latency_ms / fps / chip_temp_c / battery_pct / precision / recall']
+  stage varchar(20) [note: 'capture / inference / e2e']
+  value float [not null]
+  unit varchar(10)
+  source varchar(10) [note: 'live / replay / walk_test']
+  tags nvarchar(max) [note: 'JSON']
+
+  indexes {
+    (metric, module, ts)
+    session_id
+  }
+}
+
+// =========================================================
+// Landmark memory (stretch)
+// =========================================================
+
+Table ai.routes {
+  route_id int [pk, increment]
+  user_id int [not null, ref: > core.users.user_id]
+  name nvarchar(100) [null, note: 'named later by user or caregiver']
+  times_walked int [default: 1]
+  is_known bit [default: 0, note: '1 after N walks -> fewer alerts']
+  created_at datetimeoffset [default: `SYSDATETIMEOFFSET()`]
+  last_walked_at datetimeoffset
+}
+
+Table ai.place_memory {
+  place_id int [pk, increment]
+  route_id int [ref: > ai.routes.route_id]
+  chroma_id varchar(64) [unique, note: 'embedding stored in ChromaDB']
+  place_type varchar(20) [note: 'door / stairs / corner / crossing']
+  order_in_route smallint
+  position_source varchar(5) [note: 'gps (outdoors) / vio (indoors)']
+  lat float [note: 'when position_source = gps']
+  lon float
+  rel_x_m real [note: 'when position_source = vio: metres from the route anchor']
+  rel_y_m real
+  times_matched int [default: 0]
+  first_seen datetimeoffset
+  last_matched_at datetimeoffset
+}
+
+Table ai.landmark_matches {
+  match_id bigint [pk, increment]
+  session_id bigint [not null, ref: > ai.sessions.session_id]
+  place_id int [not null, ref: > ai.place_memory.place_id]
+  ts datetimeoffset [not null]
+  distance real [note: 'ChromaDB distance (smaller = more similar)']
+  accepted bit [note: 'below threshold and used']
+  sent_to_loop_closure bit
+  is_correct bit [note: 'filled during evaluation from walk tests']
+}
+
+// =========================================================
+// Daily summary (computed every night)
+// =========================================================
+
+Table ai.daily_summary {
+  summary_id bigint [pk, increment]
+  user_id int [not null, ref: > core.users.user_id]
+  summary_date date [not null, note: 'Cairo day']
+  sessions_count smallint
+  active_minutes int
+  distance_walked_m real
+  obstacles_detected int
+  alerts_count int
+  near_misses int [note: 'ttc_s < 1 s']
+  emergencies_count smallint
+  emergencies_cancelled smallint
+  wellbeing_checks smallint
+  wellbeing_escalations smallint
+  faults_count smallint
+  min_battery_pct smallint
+  last_lat float
+  last_lon float
+  generated_at datetimeoffset [default: `SYSDATETIMEOFFSET()`]
+
+  indexes {
+    (user_id, summary_date) [unique]
+  }
+}
+
+// =========================================================
+// Groups
+// =========================================================
+
+TableGroup core_reference [color: #9E9E9E] {
+  core.users
+  core.caregivers
+}
+
+TableGroup ai_schema [color: #E07A5F] {
+  ai.sessions
+  ai.obstacles
+  ai.alerts
+  ai.location_logs
+  ai.emergency_events
+  ai.call_attempts
+  ai.wellbeing_checks
+  ai.faults
+  ai.blackbox_snapshots
+  ai.performance_metrics
+  ai.routes
+  ai.place_memory
+  ai.landmark_matches
+  ai.daily_summary
+}
