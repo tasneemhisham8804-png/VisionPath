@@ -1,0 +1,2 @@
+pyzmq>=26
+pytest>=8
