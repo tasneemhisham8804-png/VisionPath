@@ -1,0 +1,18 @@
+{
+  "age_frames": 12,
+  "bearing": "ahead",
+  "bearing_deg": 2.5,
+  "closing_speed_mps": 1.6,
+  "confidence": 0.9,
+  "distance_m": 2.4,
+  "ego_compensated": false,
+  "hazard": "pedestrian",
+  "msg_type": "track",
+  "schema_version": "1.0.0",
+  "seq": 42,
+  "source": "tracker",
+  "t_mono_ns": 1000063000000,
+  "t_origin_ns": 1000000000000,
+  "track_id": 7,
+  "ttc_s": 1.5
+}

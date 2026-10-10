@@ -1,0 +1,19 @@
+{
+  "alert_id": 5,
+  "bearing": "ahead",
+  "channel": "haptic",
+  "command_id": 9,
+  "confidence": 0.9,
+  "haptic_pattern": "approach_ahead",
+  "intensity": 0.8,
+  "interrupt": true,
+  "language": null,
+  "msg_type": "output_command",
+  "priority": "high",
+  "schema_version": "1.0.0",
+  "seq": 9,
+  "source": "feedback",
+  "t_mono_ns": 1000075000000,
+  "t_origin_ns": 1000000000000,
+  "voice_line": null
+}

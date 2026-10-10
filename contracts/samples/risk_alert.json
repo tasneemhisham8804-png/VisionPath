@@ -1,0 +1,20 @@
+{
+  "alert_id": 5,
+  "bearing": "ahead",
+  "confidence": 0.9,
+  "hazard": "pedestrian",
+  "msg_type": "risk_alert",
+  "priority": "high",
+  "reason": {
+    "code": "ttc_below_threshold",
+    "detail": "ttc 1.5 s < 2.0 s",
+    "distance_m": 2.4,
+    "ttc_s": 1.5
+  },
+  "schema_version": "1.0.0",
+  "seq": 5,
+  "source": "risk",
+  "t_mono_ns": 1000068000000,
+  "t_origin_ns": 1000000000000,
+  "track_id": 7
+}

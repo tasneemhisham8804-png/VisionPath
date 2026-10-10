@@ -1,0 +1,20 @@
+{
+  "alert_id": 6,
+  "bearing": "ahead",
+  "confidence": 0.6,
+  "hazard": "unknown_obstacle",
+  "msg_type": "risk_alert",
+  "priority": "critical",
+  "reason": {
+    "code": "close_range",
+    "detail": "camera down, ultrasonic only",
+    "distance_m": 0.5,
+    "ttc_s": null
+  },
+  "schema_version": "1.0.0",
+  "seq": 6,
+  "source": "risk",
+  "t_mono_ns": 1000500000000,
+  "t_origin_ns": 1000400000000,
+  "track_id": null
+}
