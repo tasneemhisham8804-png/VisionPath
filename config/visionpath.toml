@@ -1,0 +1,21 @@
+# VisionPath runtime configuration, shared by the modules on the Pi.
+# Change values here, never in the code.
+# Another file can be used with:  set VISIONPATH_CONFIG=path\to\file.toml
+# Relative paths are relative to the repository root.
+
+[bus]
+# ZeroMQ PUB/SUB, no broker. The topic of every message is its msg_type
+# (camera_frame, ultrasonic_reading, detection_set, fused_obstacle, track,
+# risk_alert, output_command).
+endpoint = "tcp://127.0.0.1:5555"
+# If each module ends up with its own port, replace the line above with a list:
+# endpoints = ["tcp://127.0.0.1:5555", "tcp://127.0.0.1:5556"]
+
+[datalogger]
+db_path = "data/visionpath.db"     # on-device SQLite database
+blackbox_dir = "data/blackbox"     # black box snapshots (.jsonl)
+user_id = 1                        # the user this device belongs to
+window_s = 30                      # black box keeps the last 30 s
+near_miss_ttc_s = 1.0              # track.ttc_s below this = near miss
+cooldown_s = 10                    # at most one snapshot of each kind per 10 s
+flush_interval_s = 1.0             # commit logged rows to the database every second

@@ -1,2 +1,1 @@
-pyzmq>=26
-pytest>=8
+pyzmq>=26          # ZeroMQ bus, only needed for live mode (python -m datalogger.run)
