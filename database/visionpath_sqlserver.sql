@@ -1,5 +1,5 @@
 ﻿/* =====================================================================
-   VisionPath — Full database script for SQL Server (T-SQL)   v2
+   VisionPath — Full database script for SQL Server (T-SQL)   v2.1 (aligned with data contract 1.0.0)
    Run in SSMS: open this file, then press Execute (F5).
 
    Schema 1: core -> people, accounts and settings (from the app)   7 tables
@@ -195,9 +195,9 @@ CREATE TABLE ai.obstacles (
     obstacle_id        BIGINT IDENTITY(1,1) NOT NULL,
     session_id         BIGINT               NOT NULL,
     track_id           INT                  NULL,   -- ByteTrack ID within session
-    class              VARCHAR(30)          NULL,   -- pole / step / curb / pedestrian / overhead / manhole / pothole / motorbike / tuktuk / cable / unknown
+    class              VARCHAR(30)          NULL,   -- contract HazardClass: curb / step / pole / pedestrian / overhead / manhole / pothole / motorbike / tuktuk / hanging_cable / vehicle / drop / unknown_obstacle
     confidence         REAL                 NULL,
-    source             VARCHAR(15)          NULL,   -- camera / ultrasonic / fused
+    source             VARCHAR(15)          NULL,   -- camera / depth / ultrasonic / fused
     distance_m         REAL                 NULL,
     direction          VARCHAR(10)          NULL,   -- left / ahead / right (data contract)
     height_level       VARCHAR(10)          NULL,   -- ground / body / head
@@ -213,7 +213,7 @@ CREATE TABLE ai.obstacles (
     CONSTRAINT FK_obstacles_session FOREIGN KEY (session_id)
         REFERENCES ai.sessions (session_id) ON DELETE CASCADE,
     CONSTRAINT CK_obstacles_conf   CHECK (confidence BETWEEN 0 AND 1),
-    CONSTRAINT CK_obstacles_source CHECK (source IN ('camera', 'ultrasonic', 'fused')),
+    CONSTRAINT CK_obstacles_source CHECK (source IN ('camera', 'depth', 'ultrasonic', 'fused')),
     CONSTRAINT CK_obstacles_dir    CHECK (direction IN ('left', 'ahead', 'right')),
     CONSTRAINT CK_obstacles_height CHECK (height_level IN ('ground', 'body', 'head')),
     CONSTRAINT CK_obstacles_drop   CHECK (drop_height_band IN ('low', 'medium', 'high'))
@@ -247,10 +247,10 @@ CREATE TABLE ai.alerts (
     fault_id        BIGINT               NULL,   -- set when caused by a fault
     ts              DATETIMEOFFSET(3)    NOT NULL,
     alert_type      VARCHAR(20)          NULL,   -- obstacle / battery_low / system_fault / weather_degraded / fall
-    reason_code     VARCHAR(40)          NULL,   -- e.g. POLE_AHEAD_2S
+    reason_code     VARCHAR(40)          NULL,   -- contract ReasonCode, e.g. ttc_below_threshold
     channel         VARCHAR(10)          NULL,   -- voice / haptic / buzzer
     direction       VARCHAR(10)          NULL,
-    priority        SMALLINT             NULL,
+    priority        SMALLINT             NULL,   -- contract Priority.rank: 0 critical .. 4 info
     message         NVARCHAR(MAX)        NULL,
     e2e_latency_ms  REAL                 NULL,   -- target < 300 ms
     CONSTRAINT PK_alerts PRIMARY KEY (alert_id),
@@ -261,7 +261,8 @@ CREATE TABLE ai.alerts (
     CONSTRAINT FK_alerts_fault FOREIGN KEY (fault_id)
         REFERENCES ai.faults (fault_id),
     CONSTRAINT CK_alerts_type    CHECK (alert_type IN ('obstacle', 'battery_low', 'system_fault', 'weather_degraded', 'fall')),
-    CONSTRAINT CK_alerts_channel CHECK (channel IN ('voice', 'haptic', 'buzzer'))
+    CONSTRAINT CK_alerts_channel CHECK (channel IN ('voice', 'haptic', 'buzzer')),
+    CONSTRAINT CK_alerts_priority CHECK (priority BETWEEN 0 AND 4)
 );
 GO
 

@@ -44,9 +44,9 @@ Table ai.obstacles {
   obstacle_id bigint [pk, increment]
   session_id bigint [not null, ref: > ai.sessions.session_id]
   track_id int [note: 'ByteTrack ID within session']
-  class varchar(30) [note: 'pole / step / curb / pedestrian / overhead / manhole / pothole / motorbike / tuktuk / cable / unknown']
+  class varchar(30) [note: 'contract HazardClass: curb / step / pole / pedestrian / overhead / manhole / pothole / motorbike / tuktuk / hanging_cable / vehicle / drop / unknown_obstacle']
   confidence real
-  source varchar(15) [note: 'camera / ultrasonic / fused']
+  source varchar(15) [note: 'camera / depth / ultrasonic / fused']
   distance_m real
   direction varchar(10) [note: 'left / ahead / right (as in the data contract)']
   height_level varchar(10) [note: 'ground / body / head']
@@ -67,10 +67,10 @@ Table ai.alerts {
   fault_id bigint [null, ref: > ai.faults.fault_id]
   ts datetimeoffset [not null]
   alert_type varchar(20) [note: 'obstacle / battery_low / system_fault / weather_degraded / fall']
-  reason_code varchar(40) [note: 'e.g. POLE_AHEAD_2S']
+  reason_code varchar(40) [note: 'contract ReasonCode, e.g. ttc_below_threshold']
   channel varchar(10) [note: 'voice / haptic / buzzer']
   direction varchar(10)
-  priority smallint
+  priority smallint [note: 'contract Priority.rank: 0 critical .. 4 info']
   message nvarchar(max)
   e2e_latency_ms real [note: 'target < 300 ms']
 }

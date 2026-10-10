@@ -37,9 +37,9 @@ CREATE TABLE IF NOT EXISTS obstacles (
     obstacle_id        INTEGER PRIMARY KEY,
     session_id         INTEGER NOT NULL REFERENCES sessions (session_id) ON DELETE CASCADE,
     track_id           INTEGER,
-    class              TEXT,       -- pole / step / curb / pedestrian / overhead / manhole / pothole / motorbike / tuktuk / cable / unknown
+    class              TEXT,       -- contract HazardClass: curb / step / pole / pedestrian / overhead / manhole / pothole / motorbike / tuktuk / hanging_cable / vehicle / drop / unknown_obstacle
     confidence         REAL    CHECK (confidence BETWEEN 0 AND 1),
-    source             TEXT    CHECK (source IN ('camera', 'ultrasonic', 'fused')),
+    source             TEXT    CHECK (source IN ('camera', 'depth', 'ultrasonic', 'fused')),  -- one contract SensorSource, or 'fused' when several
     distance_m         REAL,
     direction          TEXT    CHECK (direction IN ('left', 'ahead', 'right')),
     height_level       TEXT    CHECK (height_level IN ('ground', 'body', 'head')),
@@ -75,10 +75,10 @@ CREATE TABLE IF NOT EXISTS alerts (
     fault_id        INTEGER REFERENCES faults (fault_id),
     ts              TEXT    NOT NULL,
     alert_type      TEXT    CHECK (alert_type IN ('obstacle', 'battery_low', 'system_fault', 'weather_degraded', 'fall')),
-    reason_code     TEXT,
+    reason_code     TEXT,      -- contract ReasonCode, e.g. ttc_below_threshold
     channel         TEXT    CHECK (channel IN ('voice', 'haptic', 'buzzer')),
     direction       TEXT,
-    priority        INTEGER,
+    priority        INTEGER CHECK (priority BETWEEN 0 AND 4),   -- contract Priority.rank: 0 critical .. 4 info
     message         TEXT,
     e2e_latency_ms  REAL
 );
