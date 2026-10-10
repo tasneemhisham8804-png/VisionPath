@@ -31,7 +31,8 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
-*.logdata/
+*.log
+data/
 *.db
 *.db-wal
 *.db-shm
