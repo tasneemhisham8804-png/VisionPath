@@ -1,0 +1,13 @@
+{
+  "bearing": "ahead",
+  "confidence": 0.9,
+  "distance_m": 2.4,
+  "mount_deg": 0.0,
+  "msg_type": "ultrasonic_reading",
+  "schema_version": "1.0.0",
+  "sensor_id": "us-front",
+  "seq": 310,
+  "source": "ultrasonic",
+  "t_mono_ns": 1000002000000,
+  "t_origin_ns": 1000002000000
+}

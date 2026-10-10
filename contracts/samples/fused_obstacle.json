@@ -1,0 +1,19 @@
+{
+  "bearing": "ahead",
+  "bearing_deg": 2.5,
+  "confidence": 0.91,
+  "distance_m": 2.4,
+  "frame_id": 42,
+  "hazard": "pedestrian",
+  "msg_type": "fused_obstacle",
+  "obstacle_id": 0,
+  "schema_version": "1.0.0",
+  "seq": 42,
+  "source": "fusion",
+  "sources": [
+    "camera",
+    "ultrasonic"
+  ],
+  "t_mono_ns": 1000055000000,
+  "t_origin_ns": 1000000000000
+}

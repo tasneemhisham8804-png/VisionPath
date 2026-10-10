@@ -1,0 +1,27 @@
+{
+  "bearing": null,
+  "confidence": 0.95,
+  "frame_id": 42,
+  "model_id": "yolo11n-hazard-fp16-v1",
+  "msg_type": "detection_set",
+  "objects": [
+    {
+      "bbox": {
+        "x1": 0.45,
+        "x2": 0.6,
+        "y1": 0.2,
+        "y2": 0.9
+      },
+      "bearing": "ahead",
+      "bearing_deg": 2.5,
+      "depth_m": null,
+      "hazard": "pedestrian",
+      "score": 0.88
+    }
+  ],
+  "schema_version": "1.0.0",
+  "seq": 42,
+  "source": "detector",
+  "t_mono_ns": 1000038000000,
+  "t_origin_ns": 1000000000000
+}

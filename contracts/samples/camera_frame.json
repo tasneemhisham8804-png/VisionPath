@@ -1,0 +1,16 @@
+{
+  "bearing": null,
+  "camera_id": "oakd-rgb",
+  "capture": "oakd",
+  "confidence": 1.0,
+  "frame_id": 42,
+  "height": 640,
+  "image_ref": "shm://frames/42",
+  "msg_type": "camera_frame",
+  "schema_version": "1.0.0",
+  "seq": 42,
+  "source": "camera",
+  "t_mono_ns": 1000000000000,
+  "t_origin_ns": 1000000000000,
+  "width": 640
+}
