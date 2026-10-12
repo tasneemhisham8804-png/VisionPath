@@ -8,7 +8,7 @@ from scipy.io.wavfile import write
 
 RATE = 16000
 SECONDS = 5
-TAKES = 2   # how many times each person says each phrase
+TAKES = 1   # how many times each person says each phrase
 
 # save the samples next to this script (not in the folder we ran python from)
 BASE = os.path.dirname(os.path.abspath(__file__))
