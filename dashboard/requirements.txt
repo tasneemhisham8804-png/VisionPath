@@ -1,0 +1,1 @@
+streamlit>=1.41   # the QA dashboard page (pandas comes with it)
