@@ -19,7 +19,9 @@ module yields is guaranteed to pass contracts.from_json().
 
 from __future__ import annotations
 
+import heapq
 from collections import defaultdict
+from itertools import count
 from typing import Iterator
 
 from contracts import (BBox, CameraFrame, DetectedObject, DetectionSet, FusedObstacle,
@@ -34,8 +36,15 @@ ULTRASONIC_RANGE_M = 4.0
 def stub_stream(duration_s: float = 60.0, fps: int = 10, start_ns: int = 1_000_000_000_000,
                 obstacle_from_s: float = 30.0, start_distance_m: float = 12.0,
                 closing_speed_mps: float = 0.8, fault_at_s: float | None = None) -> Iterator[str]:
-    """Yield contract JSON lines in publish order (sorted by t_mono_ns)."""
+    """
+    Yield contract JSON lines in publish order (sorted by t_mono_ns).
+    At high frame rates (30 fps = one frame every 33 ms) the results of one
+    frame (up to 75 ms later) interleave with the next frames, so lines wait
+    in a small heap until nothing earlier can still come.
+    """
     seq = defaultdict(int)                       # per source counter, as the contract requires
+    pending: list = []                           # heap of (t_mono_ns, tie breaker, json line)
+    tie = count()
     alert_id = command_id = 0
     alerted_high = alerted_critical = False
     fault_sent = False
@@ -51,6 +60,8 @@ def stub_stream(duration_s: float = 60.0, fps: int = 10, start_ns: int = 1_000_0
     for frame_id in range(int(duration_s * fps)):
         t = start_ns + frame_id * frame_ns       # t_origin_ns of everything derived from this frame
         t_s = frame_id / fps
+        while pending and pending[0][0] < t:     # every later message is at or after t
+            yield heapq.heappop(pending)[2]
         out = []
 
         present = t_s >= obstacle_from_s
@@ -123,9 +134,11 @@ def stub_stream(duration_s: float = 60.0, fps: int = 10, start_ns: int = 1_000_0
                 priority="high", track_id=None,
                 reason=Reason(code="system_fault", detail="stub: camera heartbeat lost")))
 
-        out.sort(key=lambda m: m.t_mono_ns)
         for msg in out:
-            yield msg.to_json()
+            heapq.heappush(pending, (msg.t_mono_ns, next(tie), msg.to_json()))
+
+    while pending:
+        yield heapq.heappop(pending)[2]
 
 
 if __name__ == "__main__":

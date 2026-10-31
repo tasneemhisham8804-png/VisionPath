@@ -1,1 +1,1 @@
-pyzmq>=26          # ZeroMQ bus, only needed for live mode (python -m datalogger.run)
+pyzmq>=26          # ZeroMQ bus (live mode, the bus process and its test)

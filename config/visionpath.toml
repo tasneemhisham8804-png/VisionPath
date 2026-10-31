@@ -4,12 +4,18 @@
 # Relative paths are relative to the repository root.
 
 [bus]
-# ZeroMQ PUB/SUB, no broker. The topic of every message is its msg_type
-# (camera_frame, ultrasonic_reading, detection_set, fused_obstacle, track,
-# risk_alert, output_command).
-endpoint = "tcp://127.0.0.1:5555"
-# If each module ends up with its own port, replace the line above with a list:
-# endpoints = ["tcp://127.0.0.1:5555", "tcp://127.0.0.1:5556"]
+# ZeroMQ PUB/SUB. The bus process (python -m datalogger.bus) binds both
+# endpoints below; every module (detection, fusion, tracking, risk, output,
+# the datalogger, the replay harness) connects to them.
+# Topic of every message = its msg_type. Payload = msg.to_json() (contract v1.0.0).
+sub_endpoint = "tcp://127.0.0.1:5555"   # modules connect here to RECEIVE messages
+pub_endpoint = "tcp://127.0.0.1:5556"   # modules connect here to SEND messages
+
+[targets]
+latency_p95_ms = 300           # sensor reading -> each pipeline stage, 95th percentile
+
+[rates]
+camera_hz = 30                 # proposed until measured
 
 [datalogger]
 db_path = "data/visionpath.db"     # on-device SQLite database

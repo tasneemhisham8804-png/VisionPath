@@ -41,6 +41,14 @@ class StubStream(unittest.TestCase):
         self.assertEqual(times, sorted(times))
         self.assertIn("track", {m.MSG_TYPE for m in msgs})
 
+    def test_30_fps_stream_is_still_in_time_order(self):
+        """At 30 fps a frame's results (up to 75 ms) overlap the next frames."""
+        msgs = [from_json(line) for line in stub_stream(duration_s=60, fps=30, start_ns=START_NS)]
+        times = [m.t_mono_ns for m in msgs]
+        self.assertEqual(times, sorted(times))
+        self.assertEqual(sum(m.MSG_TYPE == "camera_frame" for m in msgs), 1800)
+        self.assertEqual(sum(m.MSG_TYPE == "risk_alert" for m in msgs), 2)
+
 
 class RingBuffer(BlackBoxTestCase):
     def test_keeps_only_the_last_30_seconds(self):

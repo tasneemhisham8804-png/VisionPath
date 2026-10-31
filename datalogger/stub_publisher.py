@@ -4,13 +4,14 @@ datalogger service can be tested with no camera and no other module running.
 ("stubbed now, real sensors in Week 8")
 
     python -m datalogger.stub_publisher                 # 60 s scenario, near miss at about 44 s
+    python -m datalogger.stub_publisher --fps 10        # camera rate (default: [rates] camera_hz in the config)
     python -m datalogger.stub_publisher --fault-at 50   # also one system_fault alert at 50 s
     python -m datalogger.stub_publisher --speed 10      # 10 times faster
     python -m datalogger.stub_publisher --file X.jsonl  # publish a recording instead
 
-Start `python -m datalogger.run` first, in another window: a ZeroMQ
-subscriber only receives what is published after it has connected.
-The publisher binds the endpoint from config/visionpath.toml.
+Start the bus process (python -m datalogger.bus) and `python -m datalogger.run`
+first, in other windows: a ZeroMQ subscriber only receives what is published
+after it has connected. The publisher connects to [bus] pub_endpoint in config/visionpath.toml.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from datalogger.config import ConfigError, bus_endpoints, load_config
+from datalogger.config import ConfigError, camera_hz, load_config, pub_endpoint
 from datalogger.stub_stream import stub_stream
 
 
@@ -66,6 +67,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", help="config file (default: VISIONPATH_CONFIG or config/visionpath.toml)")
     ap.add_argument("--duration", type=float, default=60.0, help="stub scenario length in seconds")
+    ap.add_argument("--fps", type=float, help="camera frames per second (default: [rates] camera_hz, else 10)")
     ap.add_argument("--fault-at", type=float, help="send one system_fault alert at this second")
     ap.add_argument("--speed", type=float, default=1.0, help="1 = real time, 10 = ten times faster")
     ap.add_argument("--wait", type=float, default=1.5, help="seconds to wait for subscribers to connect")
@@ -73,7 +75,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     try:
-        endpoint = bus_endpoints(load_config(args.config))[0]
+        cfg = load_config(args.config)
+        endpoint = pub_endpoint(cfg)
     except ConfigError as e:
         print(f"Config error: {e}", file=sys.stderr)
         return 2
@@ -85,14 +88,17 @@ def main(argv=None) -> int:
         print(e, file=sys.stderr)
         return 2
 
-    print(f"Publishing on {pub.endpoint}. Waiting {args.wait:.1f} s for subscribers ...")
+    print(f"Connected to the bus at {pub.endpoint}. Waiting {args.wait:.1f} s for subscribers ...")
     time.sleep(args.wait)
 
     start_ns = time.monotonic_ns()
     if args.file:
         lines = rebase(Path(args.file).read_text(encoding="utf-8").splitlines(), start_ns)
     else:
-        lines = list(stub_stream(duration_s=args.duration, start_ns=start_ns, fault_at_s=args.fault_at))
+        fps = args.fps or camera_hz(cfg) or 10
+        lines = list(stub_stream(duration_s=args.duration, fps=int(fps), start_ns=start_ns,
+                                 fault_at_s=args.fault_at))
+        print(f"Stub scenario: {args.duration:g} s at {int(fps)} frames per second.")
     print(f"Sending {len(lines)} messages ({args.speed:g}x real time). Ctrl+C to stop.")
 
     last = {"s": -10.0}

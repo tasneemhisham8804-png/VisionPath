@@ -1,18 +1,23 @@
 """
-ZeroMQ PUB/SUB message bus (no broker).
+ZeroMQ PUB/SUB message bus.
 
+  * The bus process binds two endpoints and every module connects:
+        [bus] pub_endpoint : modules connect a PUB socket here to send
+        [bus] sub_endpoint : modules connect a SUB socket here to receive
+    Both come from config/visionpath.toml (datalogger.config), never from the code.
   * Topic of every message = its msg_type (camera_frame, track, risk_alert, ...).
   * Each message is sent as two frames: [topic, json line]. The json line is
     exactly msg.to_json() of the data contract.
-  * The endpoint comes from config/visionpath.toml (datalogger.config), never
-    from the code.
 
-    from datalogger.bus import Publisher, Subscriber
-    endpoints = bus_endpoints(load_config())    # from datalogger.config
-    pub = Publisher(endpoints[0])               # binds
+    from datalogger.config import load_config, pub_endpoint, sub_endpoints
+    cfg = load_config()
+    pub = Publisher(pub_endpoint(cfg))          # connects
     pub.send(msg.to_json())                     # topic taken from msg_type
-    sub = Subscriber(endpoints)                 # connects, all topics
+    sub = Subscriber(sub_endpoints(cfg))        # connects, all topics
     line = sub.recv()                           # json line, or None after the timeout
+
+Development bus process (until the team's own bus process exists):
+    python -m datalogger.bus
 
 pyzmq is imported only when a socket is created, so the rest of the datalogger
 (and the CI tests) work without it.
@@ -21,6 +26,8 @@ pyzmq is imported only when a socket is created, so the rest of the datalogger
 from __future__ import annotations
 
 import json
+import sys
+import time
 
 DEFAULT_HWM = 10_000          # messages queued per socket before ZeroMQ drops (about 3 min of traffic)
 
@@ -73,7 +80,7 @@ class Subscriber:
         endpoints       : list of "tcp://host:port" (a single string also works)
         topics          : topic prefixes; ("",) = every message on the bus
         recv_timeout_ms : recv() returns None after this long without a message
-        bind            : False = connect to publishers that bind (the usual case)
+        bind            : False = connect to the bus process (the usual case)
         """
         zmq = _zmq()
         self._zmq = zmq
@@ -100,8 +107,8 @@ class Subscriber:
 
 
 class Publisher:
-    def __init__(self, endpoint: str, bind: bool = True, hwm: int = DEFAULT_HWM, context=None):
-        """endpoint from the config file; with bind=True, a port of "*" picks a free port (tests)."""
+    def __init__(self, endpoint: str, bind: bool = False, hwm: int = DEFAULT_HWM, context=None):
+        """endpoint from the config file ([bus] pub_endpoint). bind=True only for tests without a bus process."""
         zmq = _zmq()
         self.socket = (context or zmq.Context.instance()).socket(zmq.PUB)
         self.socket.setsockopt(zmq.SNDHWM, hwm)
@@ -119,3 +126,100 @@ class Publisher:
 
     def close(self) -> None:
         self.socket.close()
+
+
+class BusProxy:
+    """
+    Minimal bus process: an XSUB socket where publishers connect and an XPUB
+    socket where subscribers connect, forwarding messages one way and
+    subscriptions the other way. A port of "*" picks a free port (tests).
+    """
+
+    def __init__(self, pub_endpoint: str, sub_endpoint: str, hwm: int = DEFAULT_HWM, context=None):
+        zmq = _zmq()
+        self._zmq = zmq
+        ctx = context or zmq.Context.instance()
+        self.frontend = ctx.socket(zmq.XSUB)           # publishers connect here
+        self.frontend.setsockopt(zmq.RCVHWM, hwm)
+        self.frontend.setsockopt(zmq.LINGER, 0)
+        self.frontend.bind(pub_endpoint)
+        self.backend = ctx.socket(zmq.XPUB)            # subscribers connect here
+        self.backend.setsockopt(zmq.SNDHWM, hwm)
+        self.backend.setsockopt(zmq.LINGER, 0)
+        self.backend.bind(sub_endpoint)
+        self.pub_endpoint = self.frontend.getsockopt(zmq.LAST_ENDPOINT).decode("utf-8")
+        self.sub_endpoint = self.backend.getsockopt(zmq.LAST_ENDPOINT).decode("utf-8")
+        self._poller = zmq.Poller()
+        self._poller.register(self.frontend, zmq.POLLIN)
+        self._poller.register(self.backend, zmq.POLLIN)
+        self.forwarded = 0
+
+    def step(self, timeout_ms: int = 200) -> int:
+        """Forward whatever is waiting (at most timeout_ms of waiting). Returns messages forwarded."""
+        zmq = self._zmq
+        ready = dict(self._poller.poll(timeout_ms))
+        n = 0
+        if self.frontend in ready:                     # messages: publishers -> subscribers
+            n = self._drain(self.frontend, self.backend)
+            self.forwarded += n
+        if self.backend in ready:                      # subscriptions: subscribers -> publishers
+            self._drain(self.backend, self.frontend)
+        return n
+
+    def _drain(self, src, dst) -> int:
+        n = 0
+        while True:
+            try:
+                frames = src.recv_multipart(self._zmq.NOBLOCK)
+            except self._zmq.Again:
+                return n
+            dst.send_multipart(frames)
+            n += 1
+
+    def close(self) -> None:
+        self.frontend.close(linger=0)
+        self.backend.close(linger=0)
+
+
+def main(argv=None) -> int:
+    """python -m datalogger.bus : run the development bus process with the endpoints in config/visionpath.toml."""
+    import argparse
+    from datalogger.config import ConfigError, load_config, pub_endpoint, sub_endpoints
+
+    ap = argparse.ArgumentParser(description="Development bus process (XSUB/XPUB proxy).")
+    ap.add_argument("--config", help="config file (default: VISIONPATH_CONFIG or config/visionpath.toml)")
+    args = ap.parse_args(argv)
+    try:
+        cfg = load_config(args.config)
+        pub_ep, sub_eps = pub_endpoint(cfg), sub_endpoints(cfg)
+    except ConfigError as e:
+        print(f"Config error: {e}", file=sys.stderr)
+        return 2
+    if len(sub_eps) != 1:
+        print("Config error: the bus process needs exactly one [bus] sub_endpoint", file=sys.stderr)
+        return 2
+    try:
+        proxy = BusProxy(pub_ep, sub_eps[0])
+    except RuntimeError as e:
+        print(e, file=sys.stderr)
+        return 2
+
+    print(f"Bus running. Publishers connect to {proxy.pub_endpoint}, "
+          f"subscribers connect to {proxy.sub_endpoint}. Ctrl+C to stop.")
+    last_status, last_count = time.monotonic(), 0
+    try:
+        while True:
+            proxy.step()
+            if time.monotonic() - last_status >= 5 and proxy.forwarded != last_count:
+                last_status, last_count = time.monotonic(), proxy.forwarded
+                print(f"  {proxy.forwarded} messages forwarded")
+    except KeyboardInterrupt:
+        pass
+    finally:
+        proxy.close()
+    print(f"Bus stopped. {proxy.forwarded} messages forwarded.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,13 +1,18 @@
 """
-Read config/visionpath.toml (the bus endpoint and the datalogger settings).
+Read config/visionpath.toml (bus endpoints, latency target, camera rate and
+the datalogger settings).
 
-The bus endpoint lives only in the config file, never in the code: if the file
-or the endpoint is missing, this module raises ConfigError instead of guessing.
+The bus endpoints live only in the config file, never in the code: if the
+file or an endpoint is missing, this module raises ConfigError instead of
+guessing.
 
-    from datalogger.config import load_config, bus_endpoints, datalogger_settings
-    cfg = load_config()                 # VISIONPATH_CONFIG, else config/visionpath.toml
-    endpoints = bus_endpoints(cfg)      # list of "tcp://host:port" from [bus]
-    settings = datalogger_settings(cfg)
+    from datalogger.config import load_config, sub_endpoints, pub_endpoint
+    cfg = load_config()              # $VISIONPATH_CONFIG, else config/visionpath.toml
+    sub_endpoints(cfg)               # where modules connect to receive  [bus] sub_endpoint
+    pub_endpoint(cfg)                # where modules connect to send     [bus] pub_endpoint
+    datalogger_settings(cfg)         # [datalogger] with defaults, paths resolved
+    latency_target_ms(cfg)           # [targets] latency_p95_ms, or None
+    camera_hz(cfg)                   # [rates] camera_hz, or None
 
 Standard library only (tomllib, Python 3.11+).
 """
@@ -26,7 +31,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = REPO_ROOT / "config" / "visionpath.toml"
 ENV_VAR = "VISIONPATH_CONFIG"
 
-# Settings that are not the bus endpoint may fall back to these values.
+# Settings that are not bus endpoints may fall back to these values.
 DATALOGGER_DEFAULTS = {
     "db_path": "data/visionpath.db",
     "blackbox_dir": "data/blackbox",
@@ -48,28 +53,42 @@ def config_path(path=None) -> Path:
     return Path(path or os.environ.get(ENV_VAR) or DEFAULT_CONFIG)
 
 
-def load_config(path=None) -> dict:
+def parse_config(text: str, source: str = "config") -> dict:
     if tomllib is None:
         raise ConfigError("reading the config needs Python 3.11 or newer (tomllib)")
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError as e:
+        raise ConfigError(f"{source}: {e}") from None
+
+
+def load_config(path=None) -> dict:
     p = config_path(path)
     if not p.is_file():
         raise ConfigError(f"config file not found: {p}")
-    with open(p, "rb") as f:
-        try:
-            return tomllib.load(f)
-        except tomllib.TOMLDecodeError as e:
-            raise ConfigError(f"{p}: {e}") from None
+    return parse_config(p.read_text(encoding="utf-8"), str(p))
 
 
-def bus_endpoints(cfg: dict) -> list[str]:
-    """[bus] endpoint = "..."  or  [bus] endpoints = ["...", ...]"""
-    bus = cfg.get("bus") or {}
-    value = bus.get("endpoints", bus.get("endpoint"))
+def _endpoints(cfg: dict, key: str) -> list[str]:
+    value = (cfg.get("bus") or {}).get(key)
     if isinstance(value, str):
         value = [value]
     if not value or not all(isinstance(v, str) and v for v in value):
-        raise ConfigError("the config file needs [bus] endpoint = \"tcp://host:port\"")
+        raise ConfigError(f'the config file needs [bus] {key} = "tcp://host:port"')
     return list(value)
+
+
+def sub_endpoints(cfg: dict) -> list[str]:
+    """[bus] sub_endpoint (a string, or a list): where modules connect to receive messages."""
+    return _endpoints(cfg, "sub_endpoint")
+
+
+def pub_endpoint(cfg: dict) -> str:
+    """[bus] pub_endpoint: where modules connect to send messages."""
+    endpoints = _endpoints(cfg, "pub_endpoint")
+    if len(endpoints) != 1:
+        raise ConfigError("[bus] pub_endpoint must be a single endpoint")
+    return endpoints[0]
 
 
 def datalogger_settings(cfg: dict) -> dict:
@@ -80,3 +99,13 @@ def datalogger_settings(cfg: dict) -> dict:
         p = Path(settings[key])
         settings[key] = (p if p.is_absolute() else REPO_ROOT / p).resolve()
     return settings
+
+
+def latency_target_ms(cfg: dict) -> float | None:
+    value = (cfg.get("targets") or {}).get("latency_p95_ms")
+    return float(value) if value is not None else None
+
+
+def camera_hz(cfg: dict) -> float | None:
+    value = (cfg.get("rates") or {}).get("camera_hz")
+    return float(value) if value is not None else None

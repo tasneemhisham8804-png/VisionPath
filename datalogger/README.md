@@ -9,30 +9,45 @@ The service that runs on the Pi. It listens to every message on the ZeroMQ bus a
 
 ## Run
 
-You need Python 3.11 or newer. Live mode also needs pyzmq: `pip install -r datalogger/requirements.txt`.
+You need Python 3.11 or newer, plus `pip install -r datalogger/requirements.txt` (pyzmq).
 
 ```
-python -m datalogger.run                      # live: subscribe to the bus (Ctrl+C to stop)
-python -m datalogger.stub_publisher           # in a second window: 60 s stub scenario, near miss at about 44 s
+python -m datalogger.bus                      # window 1: development bus process (until the team's own exists)
+python -m datalogger.run                      # window 2: the datalogger (Ctrl+C to stop, prints the latency report)
+python -m datalogger.stub_publisher           # window 3: 60 s stub scenario at [rates] camera_hz, near miss at about 44 s
+python -m datalogger.report                   # latency report of the last session (p95 against the target)
 python -m datalogger.run --from-file X.jsonl  # no bus: log a recording (performance_metrics.source = replay)
 python -m datalogger.blackbox_demo            # Week 2 check without the bus: prints RESULT: PASS
-python -m unittest discover -s tests -v       # all tests (the ZeroMQ test is skipped without pyzmq)
+python -m unittest discover -s tests -v       # all tests (the bus test is skipped without pyzmq)
 ```
 
 ## Config
 
 All settings are in `config/visionpath.toml`. To use another file, set `VISIONPATH_CONFIG`.
 
-- `[bus] endpoint` (or `endpoints = [...]`) is the only place the port is written. The code has no default endpoint.
+- `[bus] sub_endpoint` (5555) and `[bus] pub_endpoint` (5556) are the only places the ports are written. The code has no default endpoint.
+- `[targets] latency_p95_ms` is the latency target (300 ms) checked by the report.
+- `[rates] camera_hz` is the camera rate (30 Hz, proposed until measured), used by the stub publisher.
 - `[datalogger]` holds the database path, the black box folder, the 30 s window, the near miss TTC (1.0 s), the 10 s cooldown and the commit interval.
 
 ## Bus format
 
-- ZeroMQ PUB/SUB, with no broker.
+- ZeroMQ PUB/SUB. The bus process binds two endpoints and every module connects:
+  - `[bus] pub_endpoint`: modules connect here to send (the bus process's XSUB socket).
+  - `[bus] sub_endpoint`: modules connect here to receive (the bus process's XPUB socket).
+  - One port cannot carry both sockets, so the bus needs two ports.
 - Every message is sent as two frames: `[topic, json]`.
   - The topic is the contract `msg_type`.
-  - The JSON is exactly `msg.to_json()`.
+  - The JSON is exactly `msg.to_json()` (contract v1.0.0).
 - The subscriber also accepts a single frame, either `"topic json"` or just the JSON.
+
+## Latency report
+
+`python -m datalogger.report` (also printed by `run` when it stops) shows p50, p95 and max latency per pipeline stage for one session.
+
+- Latency of a message = `t_mono_ns − t_origin_ns`: the time from the sensor reading to that stage. Later stages include the earlier ones.
+- PASS when the p95 of every stage is within `[targets] latency_p95_ms`.
+- Stages with fewer than 20 messages (alerts, output commands) are marked: their p95 is close to the maximum.
 
 ## What goes where
 
@@ -72,9 +87,10 @@ A snapshot is JSON Lines with one message per line, exactly as it was on the bus
 | File | What it is |
 |---|---|
 | `run.py` | The service (bus → logger + black box) |
+| `report.py` | Latency report per session (p95 against the target) |
 | `logger.py` | Messages → database rows |
 | `blackbox.py` | 30 s ring buffer and snapshots |
-| `bus.py` | ZeroMQ publisher and subscriber (pyzmq is imported only when used) |
+| `bus.py` | ZeroMQ publisher, subscriber and the development bus process (pyzmq is imported only when used) |
 | `config.py` | Reads `config/visionpath.toml` |
 | `db.py` + `schema_sqlite.sql` | The 12 on-device tables and the session clock (t_mono_ns → UTC) |
 | `stub_stream.py` / `stub_publisher.py` | Fake sensor stream until the real sensors arrive (Week 8) |

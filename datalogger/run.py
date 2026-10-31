@@ -4,13 +4,14 @@ Datalogger service: listens to every message on the ZeroMQ bus and
   * keeps the last 30 s in the black box and saves a snapshot on a
     near miss, a fault, a fall or a manual trigger (datalogger.blackbox).
 
-    python -m datalogger.run                       # live: subscribe to the bus in the config file
+    python -m datalogger.run                       # live: connect to the bus process ([bus] sub_endpoint)
     python -m datalogger.run --duration 70         # stop by itself after 70 s
     python -m datalogger.run --from-file X.jsonl   # no bus: feed a recording (session source = replay)
 
-Ctrl+C stops it cleanly: the last rows are committed and the session is closed.
-Bus endpoint, database path and black box settings come from
-config/visionpath.toml (or the file in VISIONPATH_CONFIG).
+Ctrl+C stops it cleanly: the last rows are committed, the session is closed
+and the latency report of the session is printed (datalogger.report).
+Bus endpoint, database path, black box settings and the latency target come
+from config/visionpath.toml (or the file in VISIONPATH_CONFIG).
 """
 
 from __future__ import annotations
@@ -18,15 +19,18 @@ from __future__ import annotations
 import argparse
 import json
 import signal
+import sqlite3
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 from datalogger.blackbox import BlackBox
-from datalogger.config import REPO_ROOT, ConfigError, bus_endpoints, datalogger_settings, load_config
+from datalogger.config import (REPO_ROOT, ConfigError, datalogger_settings, latency_target_ms,
+                               load_config, sub_endpoints)
 from datalogger.db import end_session, open_db, start_session
 from datalogger.logger import Logger
+from datalogger.report import session_report
 
 STATUS_EVERY_S = 5.0
 
@@ -77,7 +81,7 @@ class Service:
         self.conn.close()
 
 
-def _print_summary(service: Service) -> None:
+def _print_summary(service: Service, target_ms: float | None) -> None:
     print(f"\nSession {service.session_id} closed. {service.messages} messages received.")
     print("  " + service.logger.summary())
     if service.logger.last_error:
@@ -88,6 +92,12 @@ def _print_summary(service: Service) -> None:
     for p in service.box.snapshots:
         print(f"    {p}")
     print(f"  database : {service.settings['db_path']}")
+    conn = sqlite3.connect(service.settings["db_path"])
+    try:
+        print("\nLatency report")
+        print(session_report(conn, service.session_id, target_ms)[0])
+    finally:
+        conn.close()
 
 
 def main(argv=None) -> int:
@@ -100,7 +110,8 @@ def main(argv=None) -> int:
     try:
         cfg = load_config(args.config)
         settings = datalogger_settings(cfg)
-        endpoints = None if args.from_file else bus_endpoints(cfg)
+        target_ms = latency_target_ms(cfg)
+        endpoints = None if args.from_file else sub_endpoints(cfg)
     except ConfigError as e:
         print(f"Config error: {e}", file=sys.stderr)
         return 2
@@ -116,7 +127,7 @@ def main(argv=None) -> int:
                 if path:
                     print(f"  TRIGGER -> {path.name}")
         service.close()
-        _print_summary(service)
+        _print_summary(service, target_ms)
         return 0
 
     from datalogger.bus import Subscriber      # needs pyzmq only in live mode
@@ -130,7 +141,8 @@ def main(argv=None) -> int:
     stop = {"now": False}
     signal.signal(signal.SIGTERM, lambda *_: stop.update(now=True))   # systemd stop on the Pi
 
-    print(f"Session {service.session_id}: listening on {', '.join(endpoints)} (all topics). Ctrl+C to stop.")
+    print(f"Session {service.session_id}: connected to the bus at {', '.join(endpoints)} (all topics). "
+          "Ctrl+C to stop.")
     started = last_status = time.monotonic()
     try:
         while not stop["now"]:
@@ -152,7 +164,7 @@ def main(argv=None) -> int:
     finally:
         sub.close()
         service.close()
-    _print_summary(service)
+    _print_summary(service, target_ms)
     return 0
 
 
