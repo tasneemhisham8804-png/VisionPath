@@ -1,0 +1,1 @@
+chromadb   # optional: the team plan's database for the landmark store (the simple backend needs nothing)
