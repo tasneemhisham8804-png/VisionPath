@@ -34,3 +34,20 @@ Use `--update` only when a change is meant to move a number, and say why in the 
 | `qa/benchmarks/*.jsonl` | Real walk recordings, added from round 1 of the benchmark routes |
 
 Today the benchmarks are recordings of the stub, so the gate guards the logging chain and the latency numbers it reports. When the detection, tracking and risk code joins the repository, its replay runs here too. Recall and false alerts are checked once the walk recordings come with ground truth; the rules for them are already in place.
+
+## Fault injection (Week 5)
+
+```
+python -m qa.faults          # break a recording on purpose and check what happens, row by row
+```
+
+It walks the degraded modes table of the TDR (section 7). For each failure it changes a recorded session the way the real fault would, then checks what exists today:
+
+- **The health watch** (`qa/health.py`) notices the failure as the table's "Detected by" column says: camera down after 0.5 s without a frame, ultrasonic down when silent or frozen (the same reading sent again and again), a detection module down after 1 s.
+- **The datalogger and the black box** keep working: the other sensors are still logged, broken messages are counted and skipped, the black box file stays in time order, a system fault saves a fault snapshot.
+- **The regression gate** fails a stage that gets slower.
+- **The bus** can restart mid-session: the logger reconnects by itself.
+
+The system's own behaviour in each mode (ultrasonic only, earlier alerts, the outbox, the fail-safe buzzer...) belongs to modules that are not in the repository yet. Those rows are skipped in the tests and say who they wait for; they turn into real checks as each module arrives.
+
+The same checks run in CI on every push, through `tests/test_fault_injection.py`.
