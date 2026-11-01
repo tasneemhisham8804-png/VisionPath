@@ -1,0 +1,30 @@
+{
+  "benchmarks": {
+    "stub_10fps": {
+      "alerts": 2,
+      "logged": 2098,
+      "obstacles": 1,
+      "p95_ms": 75.0,
+      "skipped": 0,
+      "snapshots": 1
+    },
+    "stub_30fps": {
+      "alerts": 2,
+      "logged": 6282,
+      "obstacles": 1,
+      "p95_ms": 75.0,
+      "skipped": 0,
+      "snapshots": 1
+    },
+    "stub_fault": {
+      "alerts": 3,
+      "logged": 2099,
+      "obstacles": 1,
+      "p95_ms": 75.0,
+      "skipped": 0,
+      "snapshots": 2
+    }
+  },
+  "commit": "7c9f68b",
+  "updated": "2026-11-01T17:48:57Z"
+}

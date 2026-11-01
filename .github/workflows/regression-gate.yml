@@ -1,0 +1,14 @@
+# Regression gate (Week 3, QA): a change that makes the numbers worse cannot be merged.
+# It replays the benchmark sessions and compares them with qa/baseline.json.
+# The table of numbers shows on the checks page of each push and pull request.
+name: regression-gate
+on: [push, pull_request]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"   # matches Raspberry Pi OS Bookworm, like the contract tests
+      - run: python -m qa.gate
