@@ -1,0 +1,3 @@
+no hint: 0 / 20
+hint: 13 / 20
+hint + vad: 14 / 20
