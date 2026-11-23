@@ -9,7 +9,11 @@ When the user has not moved for a while, the device asks "are you okay?". If the
 ```
 python -m wellbeing.cases                  # the 11 test cases, replayed as bus messages
 python -m wellbeing.cases --save FOLDER    # also write each case as a .jsonl recording
+python -m wellbeing.live --try             # Week 8: try it live on the laptop, answering by typing
+python -m wellbeing.live                   # Week 8: live on the Pi, on the bus
 ```
+
+`--try` makes you "still" from the start and asks after 1 minute (`--interval-min 0.5` for 30 s). Type `ok`, `press`, `long`, `fall`, `walk`, `still`, `alert`, `say <word>` or `quit`. The checks go to `data/wellbeing_try.db`, not the real database. On the Pi it listens to the bus and saves every check in the datalogger's running session.
 
 ## The rule (team decision)
 
@@ -39,6 +43,7 @@ No new check during the caregiver's quiet hours (e.g. 23:00-07:00) or when the m
 | `cases.py` | The 11 test cases as recordings, and the runner |
 | `tests_plan.md` | The 11 test cases written out (Week 7 deliverable) |
 | `inputs.md` | The messages the check needs from the other modules, and what it sends back |
+| `live.py` | Week 8: the check live, on the bus or by typing (`--try`) |
 
 ## Done now, and what waits
 
@@ -50,4 +55,4 @@ No new check during the caregiver's quiet hours (e.g. 23:00-07:00) or when the m
 | Buttons | Waits for Malak Emad (`button_press`) |
 | Fall | Waits for Malak Ibrahim (`fall_detected`) |
 | Telling the caregiver | Waits for Abdelrahman (backend) and Tasneem (FCM) |
-| Live on the device | Week 8 |
+| Live on the device | Ready (`python -m wellbeing.live`). Asks for real once `motion_state` is on the bus |

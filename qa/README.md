@@ -79,3 +79,35 @@ It writes `report.md` in the folder (targets, each route, each walk, and every m
 | R13 collisions | Counted here, compared with the cane alone in Week 10 |
 
 R2 and R4 are proposals until Dr Khaled approves the evaluation methodology. Exit code: 0 every measured target met, 1 one not met, 2 a problem in the sheets (the message says which file and line).
+
+## End-to-end check (Week 8)
+
+Everything in this branch working together, from the first message to the last.
+
+```
+python -m qa.e2e                                  # laptop: two made-up walks through the whole chain
+python -m qa.e2e --db data/visionpath.db          # Pi: check the last real session
+python -m qa.e2e --db data/visionpath.db --session 12
+```
+
+On the laptop, two walks of the same route (the stub sensor stream with a pedestrian and a near miss, plus four fixed landmarks) go through 9 steps: datalogger, latency report (R1), black box, Rerun viewer, dashboard, landmark memory, familiar route, wellbeing check (saved in the walk's session) and the walk test report. Every step must say `ok`.
+
+On the Pi, `--db` checks a session recorded with the real sensors:
+
+| Step | Passes when |
+|---|---|
+| Session | The session ended (stop the datalogger first) |
+| Every stage sent messages | detection, fusion, tracking, risk and output all logged latency rows |
+| Latency (R1) | p95 of the slowest stage within the target |
+| Alerts reach the output | Every alert got a vibration or voice command |
+| Black box on the real sensors | Every snapshot file exists, holds camera and ultrasonic messages, and the camera is not `replay` |
+
+The database can also be copied to the laptop with its `blackbox` folder next to it: the files are found by name.
+
+## On the Pi (Week 8)
+
+1. Start the bus, the modules and the datalogger (`python -m datalogger.bus`, then `python -m datalogger.run`).
+2. In another terminal: `python -m wellbeing.live` (the wellbeing check on the bus).
+3. Walk, and get close to an obstacle once, so a near miss saves a black box file. Stop the datalogger with Ctrl+C.
+4. `python -m qa.e2e --db data/visionpath.db`: all 5 steps `ok`.
+5. `python -m landmarks.bench --backend chroma` (after `pip install chromadb`): the landmark store's speed on the Pi.
