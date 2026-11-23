@@ -33,3 +33,12 @@ flush_interval_s = 1.0             # commit logged rows to the database every se
 close_m = 1.5                      # anything closer than this
 min_ttc_s = 2.0                    # less time to collision than this
 same_landmark_m = 3.0              # two matches of the same class closer than this = one landmark
+
+[wellbeing]
+# Wellbeing check (wellbeing/check.py). The caregiver will change interval_min and quiet_hours
+# from the app (they come down from the server later); these are the defaults.
+interval_min = 15                  # still this long -> "are you okay?"
+answer_wait_s = 30                 # wait this long for "I'm okay" or a short press, per try
+attempts = 2                       # tries before the caregiver is told (1 or 2)
+quiet_hours = ""                   # e.g. "23:00-07:00": no new check in this time
+motion_timeout_s = 10              # no motion message for this long = signal lost, no new check
