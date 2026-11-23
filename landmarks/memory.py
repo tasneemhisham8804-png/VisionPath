@@ -78,10 +78,14 @@ class LandmarkMemory:
             break
         self.store.add(fingerprint, {"hazard": hazard, "place_x": place[0], "place_y": place[1],
                                      "session": session, "t": t, "track_id": track_id})
+        seen = best is not None and best[0] >= self.match
         return {
             "hazard": hazard,
             "place": place,
             "track_id": track_id,
             "similarity": None if best is None else round(best[0], 3),
-            "seen_before": best is not None and best[0] >= self.match,
+            "seen_before": seen,
+            # where the earlier walk stored it: the localization (Mariam) uses this for loop closure
+            "matched_place": (best[1].get("place_x"), best[1].get("place_y")) if seen else None,
+            "matched_session": best[1].get("session") if seen else None,
         }

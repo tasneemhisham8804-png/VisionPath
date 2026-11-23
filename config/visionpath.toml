@@ -25,3 +25,11 @@ window_s = 30                      # black box keeps the last 30 s
 near_miss_ttc_s = 1.0              # track.ttc_s below this = near miss
 cooldown_s = 10                    # at most one snapshot of each kind per 10 s
 flush_interval_s = 1.0             # commit logged rows to the database every second
+
+[familiar]
+# Fewer repeated alerts on a familiar route (landmarks/familiar.py). A landmark seen on an
+# earlier walk gets one full alert per walk; later alerts for it are vibration only.
+# These are never made quieter:
+close_m = 1.5                      # anything closer than this
+min_ttc_s = 2.0                    # less time to collision than this
+same_landmark_m = 3.0              # two matches of the same class closer than this = one landmark
