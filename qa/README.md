@@ -51,3 +51,31 @@ It walks the degraded modes table of the TDR (section 7). For each failure it ch
 The system's own behaviour in each mode (ultrasonic only, earlier alerts, the outbox, the fail-safe buzzer...) belongs to modules that are not in the repository yet. Those rows are skipped in the tests and say who they wait for; they turn into real checks as each module arrives.
 
 The same checks run in CI on every push, through `tests/test_fault_injection.py`.
+
+## Walk test report (Week 6)
+
+The numbers of a walk test (or a route round), from the paper field testing sheets and the device database.
+
+```
+python -m qa.walk_report --demo                                   # made-up walk test, changes nothing
+python -m qa.walk_report --new D:\GRADUATION\walk_test_1          # a folder with the 2 empty sheets
+python -m qa.walk_report D:\GRADUATION\walk_test_1 --round wt1    # the report
+```
+
+1. Before the walk test: `--new` makes `walk_log.csv` and `labels.csv`, one per paper sheet (pages 7 and 8).
+2. After it: copy the paper into them in Excel. Format the time columns as **Text** first, so Excel keeps `2:40` as it is. Save as CSV.
+   * `walk_log.csv`: one line per walk. `session` is the session number the datalogger printed. `minutes_walked` can stay blank: it then comes from the database.
+   * `labels.csv`: one line per hazard on the video (`type` = `hazard`) and one per false alert (`type` = `false_alert`). `result` can stay blank: Hit when `alert_at` is at or before `reached_2m_at`, Late when after, Miss when there is no `alert_at`.
+3. Copy the device database from the Pi (`data/visionpath.db`) to the same place on the laptop, or give it with `--db`.
+4. Run the report with the round: `wt1`, `wt2` (walk tests) or `r1`, `r2`, `r3` (route rounds).
+
+It writes `report.md` in the folder (targets, each route, each walk, and every miss, late alert and false alert to check on the video) and puts one row per route plus an `All` row in `dashboard/walk_results.csv`. Running it again replaces those rows, it never doubles them. `--no-dashboard` leaves the dashboard alone.
+
+| Target | How it is worked out |
+|---|---|
+| R2 recall >= 0.90 | Hits / (Hits + Late + Misses), high-risk hazards only |
+| R4 <= 2 false alerts per 10 min | False alerts / minutes walked x 10 |
+| R1 p95 <= 300 ms | p95 of the slowest stage, all the walks' sessions together |
+| R13 collisions | Counted here, compared with the cane alone in Week 10 |
+
+R2 and R4 are proposals until Dr Khaled approves the evaluation methodology. Exit code: 0 every measured target met, 1 one not met, 2 a problem in the sheets (the message says which file and line).
