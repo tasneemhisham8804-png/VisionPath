@@ -32,3 +32,5 @@ Thumbs.db
 dist/
 build/
 *.log*.wav
+voice/data/
+voice/piper_voice/
